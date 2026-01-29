@@ -1,0 +1,145 @@
+/*
+ * Copyright © 2015 The Gravitee team (http://gravitee.io)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.gravitee.maven.archrules.rules;
+
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.nio.file.Paths;
+import java.util.Set;
+import org.junit.jupiter.api.DisplayNameGeneration;
+import org.junit.jupiter.api.DisplayNameGenerator;
+import org.junit.jupiter.api.Test;
+
+@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
+class GlobalLoggingArchitectureRuleTest {
+
+    public static final String TARGET_TEST_CLASSES = "target/test-classes";
+
+    @Test
+    void should_throw_exception_when_no_output_directory_is_configured() {
+        assertThatThrownBy(() -> GlobalLoggingArchitectureRule.configure().check())
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Output directory is not configured");
+    }
+
+    @Test
+    void should_pass_for_compliant_classes() {
+        assertThatCode(() -> {
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .excludePackages(Set.of("io.gravitee.maven.archrules.fixtures.violation.."))
+                .check();
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_for_classes_using_logger_factory() {
+        assertThatThrownBy(() -> GlobalLoggingArchitectureRule.configure().withOutputDirectory(Paths.get(TARGET_TEST_CLASSES)).check())
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("Classes must not depend on SLF4J's LoggerFactory");
+    }
+
+    @Test
+    void should_fail_when_only_some_violation_classes_are_in_allow_list() {
+        assertThatThrownBy(() ->
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithLoggerFactoryViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AllowedBySuffixViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContainingAll(
+                "Classes must not depend on SLF4J's LoggerFactory",
+                "WithSlf4jAnnotationViolation",
+                "AnotherWithLoggerFactoryViolation"
+            );
+    }
+
+    @Test
+    void should_pass_when_all_violation_classes_are_in_allow_list() {
+        assertThatCode(() ->
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithLoggerFactoryViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AllowedBySuffixViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithSlf4jAnnotationViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.AnotherWithLoggerFactoryViolation"
+                    )
+                )
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_suffix_does_not_match() {
+        assertThatThrownBy(() ->
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowInSuffixes(Set.of("NonMatchingSuffix"))
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("Rule 'Classes must not depend on SLF4J's LoggerFactory' was violated (4 times)");
+    }
+
+    @Test
+    void should_pass_when_violation_class_matches_suffix() {
+        assertThatCode(() ->
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowInSuffixes(Set.of("Violation"))
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_pass_when_output_directory_does_not_exist() {
+        assertThatCode(() ->
+            GlobalLoggingArchitectureRule.configure().withOutputDirectory(Paths.get("non-existent-directory")).check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_pass_when_combining_allow_list_and_suffix() {
+        assertThatCode(() ->
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(Set.of("io.gravitee.maven.archrules.fixtures.violation.WithLoggerFactoryViolation"))
+                .allowInSuffixes(Set.of("Violation"))
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_excluding_only_subpackage() {
+        assertThatThrownBy(() ->
+            GlobalLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .excludePackages(Set.of("io.gravitee.maven.archrules.fixtures.violation.subpackage.."))
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("Rule 'Classes must not depend on SLF4J's LoggerFactory' was violated (3 times)");
+    }
+}
