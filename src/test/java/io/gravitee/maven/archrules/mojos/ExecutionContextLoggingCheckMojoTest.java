@@ -81,7 +81,7 @@ class ExecutionContextLoggingCheckMojoTest {
 
             assertThatThrownBy(cut::execute)
                 .isInstanceOf(MojoFailureException.class)
-                .hasMessageContaining("was violated (4 times)")
+                .hasMessageContaining("was violated (9 times)")
                 .hasMessageContaining("not call Logger directly when ExecutionContext is available");
         }
 
@@ -95,7 +95,7 @@ class ExecutionContextLoggingCheckMojoTest {
             verify(log).warn(
                 argThat(
                     (String message) ->
-                        message.contains("was violated (4 times)") &&
+                        message.contains("was violated (9 times)") &&
                         message.contains("not call Logger directly when ExecutionContext is available")
                 )
             );

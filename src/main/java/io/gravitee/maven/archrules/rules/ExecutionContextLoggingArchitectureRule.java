@@ -21,6 +21,8 @@ import static java.util.Collections.emptyList;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaParameter;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -28,9 +30,15 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Represents an architecture rule to enforce context-aware logging practices when an
@@ -204,6 +212,9 @@ public class ExecutionContextLoggingArchitectureRule {
                     return;
                 }
 
+                // Map: ViolationKey -> Set of caller method names
+                Map<ViolationKey, Set<String>> violationsByMethod = new HashMap<>();
+
                 for (JavaCodeUnit codeUnit : javaClass.getCodeUnits()) {
                     boolean hasExecutionContextInParams = codeUnit
                         .getParameters()
@@ -211,35 +222,120 @@ public class ExecutionContextLoggingArchitectureRule {
                         .anyMatch(javaParameter -> isExecutionContextType(javaParameter));
 
                     if (hasExecutionContextInParams) {
-                        boolean useWithLoggerMethod = codeUnit
+                        boolean usesWithLoggerMethod = codeUnit
                             .getMethodCallsFromSelf()
                             .stream()
                             .anyMatch(call -> WITH_LOGGER_METHOD_NAME.equals(call.getTarget().getName()));
 
-                        if (useWithLoggerMethod) {
+                        if (usesWithLoggerMethod) {
                             continue;
                         }
 
-                        codeUnit
-                            .getMethodCallsFromSelf()
-                            .stream()
-                            .filter(call -> isLoggerType(call.getTargetOwner()))
-                            .filter(call -> LOG_METHODS.contains(call.getTarget().getName()))
-                            .forEach(call -> {
-                                String message = String.format(
-                                    "Method [%s] in class [%s] calls Logger.%s() directly. " +
-                                        "Use 'ctx.withLogger(log).%s(...)' to include request context in logs.",
-                                    codeUnit.getName(),
-                                    javaClass.getName(),
-                                    call.getTarget().getName(),
-                                    call.getTarget().getName()
-                                );
-                                events.add(SimpleConditionEvent.violated(javaClass, message));
-                            });
+                        // Collect methods to check: current method + called internal (private/protected) methods
+                        Set<JavaCodeUnit> methodsToCheck = new HashSet<>();
+                        methodsToCheck.add(codeUnit);
+                        methodsToCheck.addAll(collectCalledInternalMethods(codeUnit, javaClass));
+
+                        // Check for direct logger calls in all collected methods
+                        for (JavaCodeUnit methodToCheck : methodsToCheck) {
+                            // Check if this method has ExecutionContext parameter and uses withLogger
+                            boolean hasCtxInMethod = methodToCheck
+                                .getParameters()
+                                .stream()
+                                .anyMatch(javaParameter -> isExecutionContextType(javaParameter));
+
+                            boolean usesWithLoggerInMethod = methodToCheck
+                                .getMethodCallsFromSelf()
+                                .stream()
+                                .anyMatch(call -> WITH_LOGGER_METHOD_NAME.equals(call.getTarget().getName()));
+
+                            // Skip logging checks ONLY if method has ctx AND uses withLogger
+                            boolean shouldSkipLoggingCheck = hasCtxInMethod && usesWithLoggerInMethod;
+
+                            if (!shouldSkipLoggingCheck) {
+                                methodToCheck
+                                    .getMethodCallsFromSelf()
+                                    .stream()
+                                    .filter(call -> isLoggerType(call.getTargetOwner()))
+                                    .filter(call -> LOG_METHODS.contains(call.getTarget().getName()))
+                                    .forEach(call -> {
+                                        ViolationKey key = new ViolationKey(javaClass, methodToCheck.getName(), call.getTarget().getName());
+                                        violationsByMethod.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(codeUnit.getName());
+                                    });
+                            }
+                        }
                     }
                 }
+
+                // Generate one event per violation with grouped callers
+                violationsByMethod.forEach((key, callers) -> {
+                    String message = buildViolationMessage(key, callers);
+                    events.add(SimpleConditionEvent.violated(key.javaClass, message));
+                });
             }
         };
+    }
+
+    private String buildViolationMessage(ViolationKey key, Set<String> callers) {
+        String className = key.javaClass.getSimpleName();
+        String methodName = key.methodName;
+        String logMethod = key.logMethod;
+
+        if (callers.size() == 1 && callers.iterator().next().equals(methodName)) {
+            // Direct call - no delegation
+            return String.format(
+                "[%s.%s] calls Logger.%s(), use ctx.withLogger(log).%s(...) instead",
+                className,
+                methodName,
+                logMethod,
+                logMethod
+            );
+        } else {
+            // Called by one or more methods
+            String callersList = callers
+                .stream()
+                .filter(caller -> !caller.equals(methodName))
+                .map(caller -> "  - " + caller)
+                .collect(Collectors.joining("\n"));
+
+            return String.format(
+                "[%s.%s] calls Logger.%s(), use ctx.withLogger(log).%s(...) instead. Called by:\n%s",
+                className,
+                methodName,
+                logMethod,
+                logMethod,
+                callersList
+            );
+        }
+    }
+
+    private static class ViolationKey {
+
+        private final JavaClass javaClass;
+        private final String methodName;
+        private final String logMethod;
+
+        ViolationKey(JavaClass javaClass, String methodName, String logMethod) {
+            this.javaClass = javaClass;
+            this.methodName = methodName;
+            this.logMethod = logMethod;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ViolationKey that = (ViolationKey) o;
+            return (javaClass.equals(that.javaClass) && methodName.equals(that.methodName) && logMethod.equals(that.logMethod));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = javaClass.hashCode();
+            result = 31 * result + methodName.hashCode();
+            result = 31 * result + logMethod.hashCode();
+            return result;
+        }
     }
 
     private JavaClasses importClasses() {
@@ -286,5 +382,52 @@ public class ExecutionContextLoggingArchitectureRule {
 
     private static boolean isLoggerType(JavaClass targetOwner) {
         return targetOwner.isAssignableTo("org.slf4j.Logger");
+    }
+
+    /**
+     * Checks if a method is private or protected (non-public internal method).
+     */
+    private static boolean isNonPublicMethod(JavaCodeUnit codeUnit) {
+        Set<JavaModifier> modifiers = codeUnit.getModifiers();
+        return modifiers.contains(JavaModifier.PRIVATE) || modifiers.contains(JavaModifier.PROTECTED);
+    }
+
+    /**
+     * Collects all private and protected methods of the same class that are called
+     * (directly or transitively) from the given code unit.
+     * This enables detection of logging violations in delegated internal methods.
+     *
+     * @param origin    the method from which to start the call graph traversal
+     * @param javaClass the class containing the methods
+     * @return set of internal methods reachable from the origin method
+     */
+    private Set<JavaCodeUnit> collectCalledInternalMethods(JavaCodeUnit origin, JavaClass javaClass) {
+        Set<JavaCodeUnit> visited = new HashSet<>();
+        Deque<JavaCodeUnit> toVisit = new ArrayDeque<>();
+        toVisit.add(origin);
+
+        while (!toVisit.isEmpty()) {
+            JavaCodeUnit current = toVisit.poll();
+            current
+                .getMethodCallsFromSelf()
+                .stream()
+                .flatMap(call -> call.getTarget().resolveMember().stream())
+                .filter(target -> belongsToClass(target, javaClass))
+                .filter(ExecutionContextLoggingArchitectureRule::isNonPublicMethod)
+                .filter(target -> isNotYetVisited(target, visited))
+                .forEach(target -> {
+                    visited.add(target);
+                    toVisit.add(target); // Continue traversal recursively
+                });
+        }
+        return visited;
+    }
+
+    private static boolean belongsToClass(JavaCodeUnit codeUnit, JavaClass javaClass) {
+        return codeUnit.getOwner().equals(javaClass);
+    }
+
+    private static boolean isNotYetVisited(JavaCodeUnit codeUnit, Set<JavaCodeUnit> visited) {
+        return !visited.contains(codeUnit);
     }
 }

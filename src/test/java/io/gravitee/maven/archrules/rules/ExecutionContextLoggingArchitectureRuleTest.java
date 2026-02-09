@@ -52,7 +52,8 @@ class ExecutionContextLoggingArchitectureRuleTest {
             ExecutionContextLoggingArchitectureRule.configure().withOutputDirectory(Paths.get(TARGET_TEST_CLASSES)).check()
         )
             .isInstanceOf(AssertionError.class)
-            .hasMessageContaining("not call Logger directly when ExecutionContext is available");
+            .hasMessageContaining("not call Logger directly when ExecutionContext is available")
+            .hasMessageContaining("was violated (9 times)");
     }
 
     @Test
@@ -65,7 +66,12 @@ class ExecutionContextLoggingArchitectureRuleTest {
                         "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
-                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation"
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation"
                     )
                 )
                 .check()
@@ -110,5 +116,128 @@ class ExecutionContextLoggingArchitectureRuleTest {
                 .allowInSuffixes(Set.of("Violation"))
                 .check()
         ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_private_method_calls_logger_directly() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("[InternalMethodViolation.processInternal]")
+            .hasMessageContaining("Called by:\n  - processWithContext");
+    }
+
+    @Test
+    void should_fail_when_protected_method_calls_logger_directly() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("[ProtectedMethodViolation.processProtected]")
+            .hasMessageContaining("Called by:\n  - processWithContext");
+    }
+
+    @Test
+    void should_fail_when_transitive_call_logs_directly() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("[TransitiveCallViolation.secondInternalMethod]")
+            .hasMessageContaining("Called by:\n  - processWithContext");
+    }
+
+    @Test
+    void should_pass_when_compliant_class_with_internal_method_and_context() {
+        assertThatCode(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .excludePackages(Set.of("io.gravitee.maven.archrules.fixtures.violation.."))
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_private_method_with_context_calls_method_without_context() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("[TransitiveWithContextViolation.helperWithoutContext]")
+            .hasMessageContaining("Called by:\n  - processWithContext");
+    }
+
+    @Test
+    void should_group_violations_by_method_with_multiple_callers() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("[MultipleCallersViolation.logInternal] calls Logger.info()")
+            .hasMessageContaining("Called by:\n  - processFirstRequest\n  - processSecondRequest");
     }
 }
