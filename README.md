@@ -50,18 +50,43 @@ public class MyService {
 **What it checks:**
 - Methods that receive an `ExecutionContext` parameter should use `ctx.withLogger(log)` for logging
 - Direct calls to `Logger.info()`, `Logger.debug()`, `Logger.error()`, `Logger.warn()`, or `Logger.trace()` are flagged as violations
+- **Internal methods (private/protected) called from a method with `ExecutionContext` are also checked** (call graph traversal)
 - Legacy `io.gravitee.gateway.api.ExecutionContext` is excluded from checks
 
-**Example violation:**
+**Example violations:**
 ```java
-// ❌ Violation
+// ❌ Violation - Direct call
 public void processRequest(ExecutionContext ctx, Request request) {
     log.info("Processing request"); // Missing context information
 }
 
-// ✅ Correct
+//----------------------------------//
+
+// ❌ Violation - Via internal method
+public void processRequest(ExecutionContext ctx, Request request) {
+    processInternal(request); // Calls private method
+}
+
+private void processInternal(Request request) {
+    log.info("Processing"); // VIOLATION detected - parent has ExecutionContext
+}
+
+//----------------------------------//
+
+// ✅ Correct - Using withLogger
 public void processRequest(ExecutionContext ctx, Request request) {
     ctx.withLogger(log).info("Processing request"); // Includes correlation ID, API key, etc.
+}
+
+//----------------------------------//
+
+// ✅ Correct - Passing ExecutionContext to internal methods
+public void processRequest(ExecutionContext ctx, Request request) {
+    processInternal(ctx, request);
+}
+
+private void processInternal(ExecutionContext ctx, Request request) {
+    ctx.withLogger(log).info("Processing"); // Uses contextual logger
 }
 ```
 
