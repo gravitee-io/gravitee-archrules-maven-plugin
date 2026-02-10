@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Collects logger violations from a Java class by analyzing method calls and ExecutionContext usage.
@@ -80,9 +81,9 @@ public class ViolationCollector {
         /**
          * Collects all violations in the configured class.
          *
-         * @return map of violation keys to caller method names
+         * @return map of violation keys to violation information (callers + mixed-usage flag)
          */
-        public Map<ViolationKey, Set<String>> collect() {
+        public Map<ViolationKey, ViolationInfo> collect() {
             ViolationCollector collector = new ViolationCollector(javaClass, ignoreExecutionContextClasses);
             return collector.collectViolations();
         }
@@ -91,9 +92,10 @@ public class ViolationCollector {
     /**
      * Collects all logger violations in the configured class.
      *
-     * @return map of violation keys to caller method names
+     * @return map of violation keys to violation information
      */
-    private Map<ViolationKey, Set<String>> collectViolations() {
+    private Map<ViolationKey, ViolationInfo> collectViolations() {
+        // First pass: identify all methods WITH ExecutionContext (potential violations)
         Map<ViolationKey, Set<String>> violationsByMethod = new HashMap<>();
 
         for (JavaCodeUnit codeUnit : javaClass.getCodeUnits()) {
@@ -142,7 +144,64 @@ public class ViolationCollector {
             }
         }
 
-        return violationsByMethod;
+        // Second pass: check if any violation method is also called from methods WITHOUT ExecutionContext
+        Map<ViolationKey, Set<String>> callersWithoutContext = new HashMap<>();
+
+        for (JavaCodeUnit codeUnit : javaClass.getCodeUnits()) {
+            boolean hasExecutionContextInParams = codeUnit.getParameters().stream().anyMatch(this::isExecutionContextType);
+
+            // Only check methods WITHOUT ExecutionContext
+            if (!hasExecutionContextInParams) {
+                // Collect internal methods called by this method
+                Set<JavaCodeUnit> calledInternalMethods = collectCalledInternalMethods(codeUnit);
+
+                // For each internal method, check if it logs (and would be in violationsByMethod)
+                for (JavaCodeUnit internalMethod : calledInternalMethods) {
+                    internalMethod
+                        .getMethodCallsFromSelf()
+                        .stream()
+                        .filter(call -> isLoggerType(call.getTargetOwner()))
+                        .filter(call -> LOG_METHODS.contains(call.getTarget().getName()))
+                        .forEach(call -> {
+                            ViolationKey key = new ViolationKey(javaClass, internalMethod.getName(), call.getTarget().getName());
+                            // Only track if this is a known violation
+                            if (violationsByMethod.containsKey(key)) {
+                                callersWithoutContext.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(codeUnit.getName());
+                            }
+                        });
+                }
+            }
+        }
+
+        // Build final result with mixed-usage detection
+        // Mixed-usage: method is called WITH ctx (violation) AND also called WITHOUT ctx (legitimate)
+        // This means the private method serves both contexts and it's ambiguous whether it needs ctx
+        return violationsByMethod
+            .entrySet()
+            .stream()
+            .collect(
+                Collectors.toMap(Map.Entry::getKey, entry -> {
+                    ViolationKey key = entry.getKey();
+                    Set<String> callers = entry.getValue();
+                    return isIsMixedUsage(callersWithoutContext, key)
+                        ? new ViolationInfo.Warning(callers)
+                        : new ViolationInfo.Error(callers);
+                })
+            );
+    }
+
+    /**
+     * Determines if a given {@link ViolationKey} is associated with mixed usage patterns.
+     * Mixed usage occurs when the key is present in the map with non-empty associated data.
+     *
+     * @param callersWithoutContext a map containing {@link ViolationKey} entries with sets of callers
+     *                              that do not involve an execution context
+     * @param key                   the {@link ViolationKey} to check for mixed usage
+     * @return {@code true} if the key is present in the map and has non-empty callers;
+     *         {@code false} otherwise
+     */
+    private static boolean isIsMixedUsage(Map<ViolationKey, Set<String>> callersWithoutContext, ViolationKey key) {
+        return callersWithoutContext.containsKey(key) && !callersWithoutContext.get(key).isEmpty();
     }
 
     /**

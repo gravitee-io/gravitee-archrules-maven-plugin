@@ -15,7 +15,23 @@
  */
 package io.gravitee.maven.archrules.violations.executioncontext;
 
+import java.util.Set;
+
 /**
- * Represents a logger violation with its identifying key and detailed violation information.
+ * Sealed hierarchy representing violation information with different severity levels.
  */
-public record LoggerViolation(ViolationKey key, ViolationInfo info) {}
+public sealed interface ViolationInfo permits ViolationInfo.Error, ViolationInfo.Warning {
+    Set<String> callers();
+
+    /**
+     * A blocking violation that should fail the build.
+     */
+    record Error(Set<String> callers) implements ViolationInfo {}
+
+    /**
+     * A non-blocking warning for ambiguous mixed-usage patterns.
+     * Occurs when a private method is called both from methods with ExecutionContext
+     * and methods without ExecutionContext, making it unclear whether to pass context.
+     */
+    record Warning(Set<String> callers) implements ViolationInfo {}
+}

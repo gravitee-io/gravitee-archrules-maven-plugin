@@ -126,6 +126,7 @@ public class ExecutionContextLoggingCheckMojo extends SkippableMojo {
 
         ExecutionContextLoggingArchitectureRule.configure()
             .withOutputDirectory(outputDirectory.toPath())
+            .withWarningHandler(msg -> getLog().warn(msg))
             .allowIn(allowList)
             .allowInSuffixes(allowListSuffixes)
             .excludePackages(packagesToExclude)

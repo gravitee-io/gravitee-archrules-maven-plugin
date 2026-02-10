@@ -15,10 +15,13 @@
  */
 package io.gravitee.maven.archrules.rules;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -49,7 +52,10 @@ class ExecutionContextLoggingArchitectureRuleTest {
     @Test
     void should_fail_for_methods_calling_logger_directly_with_execution_context() {
         assertThatThrownBy(() ->
-            ExecutionContextLoggingArchitectureRule.configure().withOutputDirectory(Paths.get(TARGET_TEST_CLASSES)).check()
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
+                .check()
         )
             .isInstanceOf(AssertionError.class)
             .hasMessageContaining("not call Logger directly when ExecutionContext is available")
@@ -71,7 +77,8 @@ class ExecutionContextLoggingArchitectureRuleTest {
                         "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
-                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation"
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation"
                     )
                 )
                 .check()
@@ -100,6 +107,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         assertThatThrownBy(() ->
             ExecutionContextLoggingArchitectureRule.configure()
                 .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
                 .excludePackages(Set.of("io.gravitee.maven.archrules.fixtures.violation.subpackage.."))
                 .check()
         )
@@ -123,6 +131,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         assertThatThrownBy(() ->
             ExecutionContextLoggingArchitectureRule.configure()
                 .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
                 .allowIn(
                     Set.of(
                         "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
@@ -145,6 +154,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         assertThatThrownBy(() ->
             ExecutionContextLoggingArchitectureRule.configure()
                 .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
                 .allowIn(
                     Set.of(
                         "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
@@ -167,6 +177,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         assertThatThrownBy(() ->
             ExecutionContextLoggingArchitectureRule.configure()
                 .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
                 .allowIn(
                     Set.of(
                         "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
@@ -199,6 +210,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         assertThatThrownBy(() ->
             ExecutionContextLoggingArchitectureRule.configure()
                 .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
                 .allowIn(
                     Set.of(
                         "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
@@ -222,6 +234,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         assertThatThrownBy(() ->
             ExecutionContextLoggingArchitectureRule.configure()
                 .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
                 .allowIn(
                     Set.of(
                         "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
@@ -239,5 +252,32 @@ class ExecutionContextLoggingArchitectureRuleTest {
             .isInstanceOf(AssertionError.class)
             .hasMessageContaining("[MultipleCallersViolation.logInternal] calls Logger.info()")
             .hasMessageContaining("Called by:\n  - processFirstRequest\n  - processSecondRequest");
+    }
+
+    @Test
+    void should_emit_warning_for_mixed_usage_pattern_without_failing_build() {
+        List<String> warnings = new ArrayList<>();
+
+        assertThatCode(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(warnings::add)
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation"
+                    )
+                )
+                .check()
+        ).doesNotThrowAnyException();
+
+        assertThat(warnings).hasSize(1).first().asString().contains("[MixedUsageViolation.logInternal] calls Logger.info()");
     }
 }
