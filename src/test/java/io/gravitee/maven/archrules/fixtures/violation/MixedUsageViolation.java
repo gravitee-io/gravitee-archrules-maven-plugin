@@ -19,31 +19,30 @@ import io.gravitee.maven.archrules.fixtures.FakeExecutionContext;
 import org.slf4j.Logger;
 
 /**
- * Violates the ExecutionContextLoggingArchitectureRule:
- * Has an ExecutionContext parameter and calls a private method that calls another
- * private method that logs directly (transitive call graph).
+ * Test fixture demonstrating a mixed-usage pattern where a private method
+ * is called from both methods WITH ExecutionContext and methods WITHOUT ExecutionContext.
+ * This represents an ambiguous case that should generate a warning but not fail the build.
  */
-public class TransitiveCallViolation {
+public class MixedUsageViolation {
 
     private final Logger logger;
 
-    public TransitiveCallViolation(Logger logger) {
+    public MixedUsageViolation(Logger logger) {
         this.logger = logger;
     }
 
+    // Called WITH ExecutionContext
     public void processWithContext(FakeExecutionContext ctx) {
-        // Public method has ExecutionContext but delegates to private method
-        firstInternalMethod(ctx);
+        logInternal();
     }
 
-    private void firstInternalMethod(FakeExecutionContext ctx) {
-        // This private method calls another private method
-        secondInternalMethod();
+    // Called WITHOUT ExecutionContext
+    public void processWithoutContext() {
+        logInternal();
     }
 
-    private void secondInternalMethod() {
-        // VIOLATION: calling logger directly when ExecutionContext is available
-        // in the original caller (transitive call graph)
-        logger.debug("Processing in second internal method");
+    // Private method called by both scenarios
+    private void logInternal() {
+        logger.info("Processing data");
     }
 }

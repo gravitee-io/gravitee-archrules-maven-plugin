@@ -26,14 +26,15 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import io.gravitee.maven.archrules.violations.executioncontext.LoggerViolation;
 import io.gravitee.maven.archrules.violations.executioncontext.ViolationCollector;
+import io.gravitee.maven.archrules.violations.executioncontext.ViolationInfo;
 import io.gravitee.maven.archrules.violations.executioncontext.ViolationKey;
 import io.gravitee.maven.archrules.violations.executioncontext.ViolationMessageFormatter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Represents an architecture rule to enforce context-aware logging practices when an
@@ -68,19 +69,22 @@ public class ExecutionContextLoggingArchitectureRule {
     private final String[] packagesToExclude;
     private final Set<String> ignoreExecutionContextClasses;
     private final Path outputDirectory;
+    private final Consumer<String> warningHandler;
 
     private ExecutionContextLoggingArchitectureRule(
         Set<String> allowList,
         Set<String> allowListSuffixes,
         Set<String> packagesToExclude,
         Set<String> ignoreExecutionContextClasses,
-        Path outputDirectory
+        Path outputDirectory,
+        Consumer<String> warningHandler
     ) {
         this.allowList = allowList;
         this.allowListSuffixes = allowListSuffixes;
         this.packagesToExclude = packagesToExclude.toArray(new String[0]);
         this.ignoreExecutionContextClasses = ignoreExecutionContextClasses;
         this.outputDirectory = outputDirectory;
+        this.warningHandler = warningHandler;
     }
 
     public static Builder configure() {
@@ -94,6 +98,7 @@ public class ExecutionContextLoggingArchitectureRule {
         private final Set<String> allowListSuffixes = new HashSet<>();
         private final Set<String> ignoreExecutionContextClasses = new HashSet<>();
         private Path outputDirectory;
+        private Consumer<String> warningHandler = x -> System.out.println("⚠️ " + x);
 
         private Builder() {}
 
@@ -164,6 +169,17 @@ public class ExecutionContextLoggingArchitectureRule {
         }
 
         /**
+         * Sets a custom warning handler for non-blocking violations (e.g., mixed-usage patterns).
+         *
+         * @param warningHandler consumer that receives warning messages
+         * @return this builder
+         */
+        public Builder withWarningHandler(Consumer<String> warningHandler) {
+            this.warningHandler = warningHandler;
+            return this;
+        }
+
+        /**
          * Runs architecture rule check
          */
         public void check() {
@@ -172,7 +188,8 @@ public class ExecutionContextLoggingArchitectureRule {
                 this.allowListSuffixes,
                 this.packagesToExclude,
                 this.ignoreExecutionContextClasses,
-                this.outputDirectory
+                this.outputDirectory,
+                this.warningHandler
             );
             rule.check();
         }
@@ -204,16 +221,24 @@ public class ExecutionContextLoggingArchitectureRule {
                     return;
                 }
 
-                // Collect violations and generate events
+                // Collect violations and separate warnings from errors
                 ViolationCollector.forClass(javaClass)
                     .withIgnoredContexts(ignoreExecutionContextClasses)
                     .collect()
                     .entrySet()
                     .stream()
                     .map(entry -> new LoggerViolation(entry.getKey(), entry.getValue()))
-                    .forEach(violation ->
-                        events.add(SimpleConditionEvent.violated(violation.key().javaClass(), ViolationMessageFormatter.format(violation)))
-                    );
+                    .forEach(violation -> {
+                        if (violation.info() instanceof ViolationInfo.Warning) {
+                            // Log warning directly via handler (non-blocking)
+                            warningHandler.accept(ViolationMessageFormatter.format(violation));
+                        } else {
+                            // Add error violation that will fail the build
+                            events.add(
+                                SimpleConditionEvent.violated(violation.key().javaClass(), ViolationMessageFormatter.format(violation))
+                            );
+                        }
+                    });
             }
         };
     }

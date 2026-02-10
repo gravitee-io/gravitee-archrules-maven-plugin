@@ -35,7 +35,8 @@ public class ViolationMessageFormatter {
      */
     public static String format(LoggerViolation violation) {
         ViolationKey key = violation.key();
-        Set<String> callers = violation.callers();
+        ViolationInfo info = violation.info();
+        Set<String> callers = info.callers();
         String className = key.javaClass().getSimpleName();
         String methodName = key.methodName();
         String logMethod = key.logMethod();
