@@ -33,5 +33,14 @@ public class AnotherWithExecutionContextViolation {
     public void handleRequest(FakeExecutionContext ctx) {
         // VIOLATION: calling logger directly when ExecutionContext is available
         logger.debug("Handling request");
+
+        ctx.withLogger(logger).info("Processing request");
+        logger
+            // multiline formatting
+            .debug("Handling request multiline");
+        ctx
+            // multiline formatting
+            .withLogger(logger) // multiline formatting
+            .info("Processing request multiline");
     }
 }

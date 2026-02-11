@@ -17,13 +17,16 @@ package io.gravitee.maven.archrules.violations.executioncontext;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaParameter;
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -102,12 +105,8 @@ public class ViolationCollector {
             boolean hasExecutionContextInParams = codeUnit.getParameters().stream().anyMatch(this::isExecutionContextType);
 
             if (hasExecutionContextInParams) {
-                boolean usesWithLoggerMethod = codeUnit
-                    .getMethodCallsFromSelf()
-                    .stream()
-                    .anyMatch(call -> WITH_LOGGER_METHOD_NAME.equals(call.getTarget().getName()));
-
-                if (usesWithLoggerMethod) {
+                // Skip only if all logger calls go through withLogger
+                if (allLoggerCallsUseWithLogger(codeUnit)) {
                     continue;
                 }
 
@@ -118,27 +117,31 @@ public class ViolationCollector {
 
                 // Check for direct logger calls in all collected methods
                 for (JavaCodeUnit methodToCheck : methodsToCheck) {
-                    // Check if this method has ExecutionContext parameter and uses withLogger
                     boolean hasCtxInMethod = methodToCheck.getParameters().stream().anyMatch(this::isExecutionContextType);
 
-                    boolean usesWithLoggerInMethod = methodToCheck
-                        .getMethodCallsFromSelf()
-                        .stream()
-                        .anyMatch(call -> WITH_LOGGER_METHOD_NAME.equals(call.getTarget().getName()));
-
-                    // Skip logging checks ONLY if method has ctx AND uses withLogger
-                    boolean shouldSkipLoggingCheck = hasCtxInMethod && usesWithLoggerInMethod;
+                    // Skip logging checks ONLY if method has ctx AND all logger calls use withLogger
+                    boolean shouldSkipLoggingCheck = hasCtxInMethod && allLoggerCallsUseWithLogger(methodToCheck);
 
                     if (!shouldSkipLoggingCheck) {
-                        methodToCheck
-                            .getMethodCallsFromSelf()
-                            .stream()
-                            .filter(call -> isLoggerType(call.getTargetOwner()))
-                            .filter(call -> LOG_METHODS.contains(call.getTarget().getName()))
-                            .forEach(call -> {
-                                ViolationKey key = new ViolationKey(javaClass, methodToCheck.getName(), call.getTarget().getName());
-                                violationsByMethod.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(codeUnit.getName());
-                            });
+                        // Sort calls by line number, with withLogger calls first for the same line
+                        List<JavaMethodCall> methodCalls = methodCallsSortedByLineNumberAndWithLoggerInstruction(methodToCheck);
+
+                        for (int i = 0; i < methodCalls.size(); i++) {
+                            JavaMethodCall call = methodCalls.get(i);
+
+                            // Check if this is a logger call
+                            if (isLoggerType(call.getTargetOwner()) && LOG_METHODS.contains(call.getTarget().getName())) {
+                                // Check if previous call was withLogger
+                                boolean previousWasWithLogger =
+                                    i > 0 && WITH_LOGGER_METHOD_NAME.equals(methodCalls.get(i - 1).getTarget().getName());
+
+                                // Report only if NOT preceded by withLogger
+                                if (!previousWasWithLogger) {
+                                    ViolationKey key = new ViolationKey(javaClass, methodToCheck.getName(), call.getTarget().getName());
+                                    violationsByMethod.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(codeUnit.getName());
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -183,11 +186,34 @@ public class ViolationCollector {
                 Collectors.toMap(Map.Entry::getKey, entry -> {
                     ViolationKey key = entry.getKey();
                     Set<String> callers = entry.getValue();
-                    return isIsMixedUsage(callersWithoutContext, key)
-                        ? new ViolationInfo.Warning(callers)
-                        : new ViolationInfo.Error(callers);
+                    return isMixedUsage(callersWithoutContext, key) ? new ViolationInfo.Warning(callers) : new ViolationInfo.Error(callers);
                 })
             );
+    }
+
+    /**
+     * Retrieves method calls invoked from the specified method, sorted by their line number
+     * and prioritized based on whether they match a predefined withLogger instruction.
+     *
+     * Since ArchUnit is reading the bytecode, <code>ctx.withLogger(logger).info(...)</code> would result in two lines,
+     * one to get the result from <code>ctx.withLogger(logger)</code> and the other to do the actual logging; which makes it difficult to detect if the code has been made with the proper Logger.
+     * This will allow to check if a {@link org.slf4j.Logger} is called directly or via {@code withLogger()}
+     *
+     * @param methodToCheck the method in which to inspect all method calls
+     * @return a list of method calls, sorted first by their line number and then by whether
+     *         they match the predefined logger method name
+     */
+    private static List<JavaMethodCall> methodCallsSortedByLineNumberAndWithLoggerInstruction(JavaCodeUnit methodToCheck) {
+        return methodToCheck
+            .getMethodCallsFromSelf()
+            .stream()
+            .sorted(
+                // Order by line number
+                Comparator.comparingInt(JavaMethodCall::getLineNumber)
+                    // Then for the same line, by withLogger call first
+                    .thenComparing(call -> !WITH_LOGGER_METHOD_NAME.equals(call.getTarget().getName()))
+            )
+            .toList();
     }
 
     /**
@@ -200,8 +226,33 @@ public class ViolationCollector {
      * @return {@code true} if the key is present in the map and has non-empty callers;
      *         {@code false} otherwise
      */
-    private static boolean isIsMixedUsage(Map<ViolationKey, Set<String>> callersWithoutContext, ViolationKey key) {
+    private static boolean isMixedUsage(Map<ViolationKey, Set<String>> callersWithoutContext, ViolationKey key) {
         return callersWithoutContext.containsKey(key) && !callersWithoutContext.get(key).isEmpty();
+    }
+
+    /**
+     * Checks if all logger calls go through withLogger.
+     * Compares count of withLogger calls vs direct logger calls.
+     *
+     * @param codeUnit the code unit to analyze
+     * @return true if all logger calls are wrapped with withLogger
+     */
+    private boolean allLoggerCallsUseWithLogger(JavaCodeUnit codeUnit) {
+        long loggerCallsCount = codeUnit
+            .getMethodCallsFromSelf()
+            .stream()
+            .filter(call -> isLoggerType(call.getTargetOwner()))
+            .filter(call -> LOG_METHODS.contains(call.getTarget().getName()))
+            .count();
+
+        long withLoggerCallsCount = codeUnit
+            .getMethodCallsFromSelf()
+            .stream()
+            .filter(call -> WITH_LOGGER_METHOD_NAME.equals(call.getTarget().getName()))
+            .count();
+
+        // All logger calls go through withLogger if withLogger count >= logger calls count
+        return loggerCallsCount > 0 && withLoggerCallsCount >= loggerCallsCount;
     }
 
     /**
