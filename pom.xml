@@ -24,8 +24,56 @@
     <version>1.0.0-alpha.1</version>
     <packaging>maven-plugin</packaging>
     <inceptionYear>2015</inceptionYear>
+    <description>The Gravitee.io ArchRules plugin for all Gravitee components.</description>
+    <url>https://github.com/gravitee-io/gravitee-archrules-maven-plugin</url>
 
     <name>Gravitee.io - Maven - Architecture Rules - Maven Plugin</name>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>https://github.com/gravitee-io/gravitee-archrules-maven-plugin</url>
+        <connection>scm:git:git://github.com/gravitee-io/gravitee-archrules-maven-plugin.git</connection>
+        <developerConnection>scm:git:git@github.com:gravitee-io/gravitee-archrules-maven-plugin.git</developerConnection>
+    </scm>
+
+    <organization>
+        <name>Gravitee.IO</name>
+        <url>https://gravitee.io</url>
+    </organization>
+
+    <developers>
+        <developer>
+            <email>azize@graviteesource.com</email>
+            <name>Azize ELAMRANI</name>
+            <url>https://github.com/aelamrani</url>
+            <id>aelamrani</id>
+        </developer>
+        <developer>
+            <email>david@graviteesource.com</email>
+            <name>David BRASSELY</name>
+            <url>https://github.com/brasseld</url>
+            <id>brasseld</id>
+        </developer>
+        <developer>
+            <email>nicolas@graviteesource.com</email>
+            <name>Nicolas GERAUD</name>
+            <url>https://github.com/NicolasGeraud</url>
+            <id>NicolasGeraud</id>
+        </developer>
+        <developer>
+            <email>titouan@graviteesource.com</email>
+            <name>Titouan COMPIEGNE</name>
+            <url>https://github.com/tcompiegne</url>
+            <id>tcompiegne</id>
+        </developer>
+    </developers>
 
     <distributionManagement>
         <snapshotRepository>
