@@ -1,3 +1,10 @@
+# [1.0.0-alpha.2](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/compare/1.0.0-alpha.1...1.0.0-alpha.2) (2026-02-18)
+
+
+### Bug Fixes
+
+* add missing info for nexus deployment ([2f10a7d](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/commit/2f10a7d4a81d32cf3a70e852c6bc8c8c2c6f5fbe))
+
 # 1.0.0-alpha.1 (2026-02-13)
 
 
