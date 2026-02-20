@@ -280,4 +280,66 @@ class ExecutionContextLoggingArchitectureRuleTest {
 
         assertThat(warnings).hasSize(1).first().asString().contains("[MixedUsageViolation.logInternal] calls Logger.info()");
     }
+
+    @Test
+    void should_pass_when_additional_context_is_not_configured() {
+        assertThatCode(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation"
+                    )
+                )
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_additional_context_class_is_configured_and_used_improperly() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
+                .withAdditionalContextClasses(Set.of("io.gravitee.maven.archrules.fixtures.FakeKafkaConnectionContext"))
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("not call Logger directly when ExecutionContext is available")
+            .hasMessageContaining("[WithAdditionalContextViolation.processWithKafkaContext] calls Logger.info()");
+    }
+
+    @Test
+    void should_pass_when_additional_context_violation_is_in_allow_list() {
+        assertThatCode(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withAdditionalContextClasses(Set.of("io.gravitee.maven.archrules.fixtures.FakeKafkaConnectionContext"))
+                .allowInSuffixes(Set.of("Violation"))
+                .check()
+        ).doesNotThrowAnyException();
+    }
 }

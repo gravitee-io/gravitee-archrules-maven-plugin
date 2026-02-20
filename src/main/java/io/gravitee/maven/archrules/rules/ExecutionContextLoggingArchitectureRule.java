@@ -47,6 +47,7 @@ import java.util.function.Consumer;
  *
  * A type is considered an {@code ExecutionContext} if:
  * - Its fully qualified name contains "ExecutionContext"
+ * - OR it is explicitly listed in the additional context classes
  * - It does NOT belong to the legacy {@code io.gravitee.gateway.api} package
  * - It is NOT explicitly listed in the ignored execution context classes
  *
@@ -57,6 +58,7 @@ import java.util.function.Consumer;
  * - Allow-listing classes based on their name suffixes.
  * - Excluding certain packages from the analysis.
  * - Ignoring specific {@code ExecutionContext} implementations that should not trigger the rule.
+ * - Adding additional context classes (e.g., {@code KafkaConnectionContext}) to be scanned.
  *
  * Use the {@link Builder} to configure and execute the rule check.
  *
@@ -68,6 +70,7 @@ public class ExecutionContextLoggingArchitectureRule {
     private final Set<String> allowListSuffixes;
     private final String[] packagesToExclude;
     private final Set<String> ignoreExecutionContextClasses;
+    private final Set<String> additionalContextClasses;
     private final Path outputDirectory;
     private final Consumer<String> warningHandler;
 
@@ -76,6 +79,7 @@ public class ExecutionContextLoggingArchitectureRule {
         Set<String> allowListSuffixes,
         Set<String> packagesToExclude,
         Set<String> ignoreExecutionContextClasses,
+        Set<String> additionalContextClasses,
         Path outputDirectory,
         Consumer<String> warningHandler
     ) {
@@ -83,6 +87,7 @@ public class ExecutionContextLoggingArchitectureRule {
         this.allowListSuffixes = allowListSuffixes;
         this.packagesToExclude = packagesToExclude.toArray(new String[0]);
         this.ignoreExecutionContextClasses = ignoreExecutionContextClasses;
+        this.additionalContextClasses = additionalContextClasses;
         this.outputDirectory = outputDirectory;
         this.warningHandler = warningHandler;
     }
@@ -97,6 +102,7 @@ public class ExecutionContextLoggingArchitectureRule {
         private final Set<String> allowList = new HashSet<>();
         private final Set<String> allowListSuffixes = new HashSet<>();
         private final Set<String> ignoreExecutionContextClasses = new HashSet<>();
+        private final Set<String> additionalContextClasses = new HashSet<>();
         private Path outputDirectory;
         private Consumer<String> warningHandler = x -> System.out.println("⚠️ " + x);
 
@@ -169,6 +175,21 @@ public class ExecutionContextLoggingArchitectureRule {
         }
 
         /**
+         * Adds additional context class names to be scanned for logging violations.
+         * These classes will be treated as execution contexts even if they don't contain "ExecutionContext" in their name.
+         * For example, you can add "io.gravitee.node.api.kafka.KafkaConnectionContext" to also scan Kafka contexts.
+         *
+         * @param additionalContextClasses a collection of fully qualified class names to treat as contexts (null values are ignored)
+         * @return this builder
+         */
+        public Builder withAdditionalContextClasses(Collection<String> additionalContextClasses) {
+            if (additionalContextClasses != null && !additionalContextClasses.isEmpty()) {
+                this.additionalContextClasses.addAll(additionalContextClasses);
+            }
+            return this;
+        }
+
+        /**
          * Sets a custom warning handler for non-blocking violations (e.g., mixed-usage patterns).
          *
          * @param warningHandler consumer that receives warning messages
@@ -188,6 +209,7 @@ public class ExecutionContextLoggingArchitectureRule {
                 this.allowListSuffixes,
                 this.packagesToExclude,
                 this.ignoreExecutionContextClasses,
+                this.additionalContextClasses,
                 this.outputDirectory,
                 this.warningHandler
             );
@@ -224,6 +246,7 @@ public class ExecutionContextLoggingArchitectureRule {
                 // Collect violations and separate warnings from errors
                 ViolationCollector.forClass(javaClass)
                     .withIgnoredContexts(ignoreExecutionContextClasses)
+                    .withAdditionalContextClasses(additionalContextClasses)
                     .collect()
                     .entrySet()
                     .stream()

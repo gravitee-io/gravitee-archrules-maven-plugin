@@ -42,10 +42,12 @@ public class ViolationCollector {
 
     private final JavaClass javaClass;
     private final Set<String> ignoreExecutionContextClasses;
+    private final Set<String> additionalContextClasses;
 
-    private ViolationCollector(JavaClass javaClass, Set<String> ignoreExecutionContextClasses) {
+    private ViolationCollector(JavaClass javaClass, Set<String> ignoreExecutionContextClasses, Set<String> additionalContextClasses) {
         this.javaClass = javaClass;
         this.ignoreExecutionContextClasses = ignoreExecutionContextClasses;
+        this.additionalContextClasses = additionalContextClasses;
     }
 
     /**
@@ -65,6 +67,7 @@ public class ViolationCollector {
 
         private final JavaClass javaClass;
         private Set<String> ignoreExecutionContextClasses = new HashSet<>();
+        private Set<String> additionalContextClasses = new HashSet<>();
 
         private Builder(JavaClass javaClass) {
             this.javaClass = javaClass;
@@ -82,12 +85,23 @@ public class ViolationCollector {
         }
 
         /**
+         * Specifies additional context classes to scan for logging violations.
+         *
+         * @param additionalContextClasses set of fully qualified class names to treat as contexts
+         * @return this builder
+         */
+        public Builder withAdditionalContextClasses(Set<String> additionalContextClasses) {
+            this.additionalContextClasses = additionalContextClasses;
+            return this;
+        }
+
+        /**
          * Collects all violations in the configured class.
          *
          * @return map of violation keys to violation information (callers + mixed-usage flag)
          */
         public Map<ViolationKey, ViolationInfo> collect() {
-            ViolationCollector collector = new ViolationCollector(javaClass, ignoreExecutionContextClasses);
+            ViolationCollector collector = new ViolationCollector(javaClass, ignoreExecutionContextClasses, additionalContextClasses);
             return collector.collectViolations();
         }
     }
@@ -261,12 +275,18 @@ public class ViolationCollector {
     private boolean isExecutionContextType(JavaParameter javaParameter) {
         String fullTypeName = javaParameter.getRawType().getName();
         return (
-            isExecutionContextType(fullTypeName) && isNotLegacyExecutionContext(fullTypeName) && isNotIgnoredExecutionContext(fullTypeName)
+            (isExecutionContextType(fullTypeName) || isAdditionalContextType(fullTypeName)) &&
+            isNotLegacyExecutionContext(fullTypeName) &&
+            isNotIgnoredExecutionContext(fullTypeName)
         );
     }
 
     private static boolean isExecutionContextType(String fullTypeName) {
         return fullTypeName.contains("ExecutionContext");
+    }
+
+    private boolean isAdditionalContextType(String fullTypeName) {
+        return additionalContextClasses.contains(fullTypeName);
     }
 
     private static boolean isNotLegacyExecutionContext(String fullTypeName) {

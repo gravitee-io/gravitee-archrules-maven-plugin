@@ -119,6 +119,34 @@ public class ExecutionContextLoggingCheckMojo extends SkippableMojo {
     @Parameter(property = "gravitee.archrules.ignoreExecutionContextClasses")
     private List<String> ignoreExecutionContextClasses;
 
+    /**
+     * List of additional context class names to be scanned for logging violations.
+     * <p>
+     * This parameter allows specifying custom context types that should be treated as execution contexts,
+     * even if they don't contain "ExecutionContext" in their name. This is useful for scanning specialized
+     * context types like KafkaConnectionContext or custom context implementations.
+     * <p>
+     * When a method has a parameter of one of these types, the rule will enforce that logging should be
+     * done through {@code ctx.withLogger(log)} instead of calling the logger directly.
+     *
+     * <p>Can be configured in two ways:</p>
+     * <ul>
+     *   <li>Command line: {@code mvn ... -Dgravitee.archrules.additionalContextClasses=io.gravitee.node.api.kafka.KafkaConnectionContext}</li>
+     *   <li>POM configuration:
+     *     <pre>{@code
+     * <configuration>
+     *   <additionalContextClasses>
+     *     <additionalContextClass>io.gravitee.node.api.kafka.KafkaConnectionContext</additionalContextClass>
+     *     <additionalContextClass>com.example.CustomContext</additionalContextClass>
+     *   </additionalContextClasses>
+     * </configuration>
+     *     }</pre>
+     *   </li>
+     * </ul>
+     */
+    @Parameter(property = "gravitee.archrules.additionalContextClasses")
+    private List<String> additionalContextClasses;
+
     @Override
     protected void doExecute() throws MojoExecutionException, MojoFailureException {
         getLog().info("Starting Execution Context Logging ArchUnit rules check...");
@@ -131,6 +159,7 @@ public class ExecutionContextLoggingCheckMojo extends SkippableMojo {
             .allowInSuffixes(allowListSuffixes)
             .excludePackages(packagesToExclude)
             .ignoreExecutionContextClass(ignoreExecutionContextClasses)
+            .withAdditionalContextClasses(additionalContextClasses)
             .check();
 
         getLog().info("All Execution Context Logging ArchUnit rules passed.");
@@ -144,6 +173,8 @@ public class ExecutionContextLoggingCheckMojo extends SkippableMojo {
         getLog().info("Packages to exclude: " + packagesToExclude);
 
         getLog().info("Ignore ExecutionContext classes: " + ignoreExecutionContextClasses);
+
+        getLog().info("Additional context classes: " + additionalContextClasses);
     }
 
     @VisibleForTesting
@@ -164,5 +195,10 @@ public class ExecutionContextLoggingCheckMojo extends SkippableMojo {
     @VisibleForTesting
     public void setIgnoreExecutionContextClasses(List<String> ignoreExecutionContextClasses) {
         this.ignoreExecutionContextClasses = ignoreExecutionContextClasses;
+    }
+
+    @VisibleForTesting
+    public void setAdditionalContextClasses(List<String> additionalContextClasses) {
+        this.additionalContextClasses = additionalContextClasses;
     }
 }
