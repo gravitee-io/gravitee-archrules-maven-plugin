@@ -52,6 +52,7 @@ public class MyService {
 - Direct calls to `Logger.info()`, `Logger.debug()`, `Logger.error()`, `Logger.warn()`, or `Logger.trace()` are flagged as violations
 - **Internal methods (private/protected) called from a method with `ExecutionContext` are also checked** (call graph traversal)
 - Legacy `io.gravitee.gateway.api.ExecutionContext` is excluded from checks
+- Additional context classes can be configured to extend the rule beyond `ExecutionContext` types (e.g., `KafkaConnectionContext`)
 
 **Example violations:**
 ```java
@@ -88,7 +89,21 @@ public void processRequest(ExecutionContext ctx, Request request) {
 private void processInternal(ExecutionContext ctx, Request request) {
     ctx.withLogger(log).info("Processing"); // Uses contextual logger
 }
+
+//----------------------------------//
+
+// ❌ Violation - With additional context type (KafkaConnectionContext)
+public void processKafkaMessage(KafkaConnectionContext ctx, Message msg) {
+    log.info("Processing message"); // Missing Kafka context information
+}
+
+// ✅ Correct - Using withLogger with additional context type
+public void processKafkaMessage(KafkaConnectionContext ctx, Message msg) {
+    ctx.withLogger(log).info("Processing message"); // Includes Kafka connection details
+}
 ```
+
+**Note:** To scan additional context types like `KafkaConnectionContext`, you must configure the `additionalContextClasses` parameter (see [Advanced Configuration](#advanced-xml-configuration)).
 
 ## Configuration
 
@@ -180,6 +195,12 @@ Customize rule checks with allow-lists and exclusions:
                     <ignoreExecutionContextClass>com.example.FakeExecutionContext</ignoreExecutionContextClass>
                     <ignoreExecutionContextClass>com.example.MockExecutionContext</ignoreExecutionContextClass>
                 </ignoreExecutionContextClasses>
+
+                <!-- Add additional context classes to scan (e.g., KafkaConnectionContext) -->
+                <additionalContextClasses>
+                    <additionalContextClass>io.gravitee.node.api.kafka.KafkaConnectionContext</additionalContextClass>
+                    <additionalContextClass>com.example.CustomContext</additionalContextClass>
+                </additionalContextClasses>
             </configuration>
         </execution>
     </executions>
@@ -207,7 +228,8 @@ mvn verify \
 mvn gioArchRules:execution-context-logging-check \
   -Dgravitee.archrules.allowList=com.example.SpecialHandler \
   -Dgravitee.archrules.packagesToExclude=com.example.tests.. \
-  -Dgravitee.archrules.ignoreExecutionContextClasses=com.example.FakeExecutionContext,com.example.MockExecutionContext
+  -Dgravitee.archrules.ignoreExecutionContextClasses=com.example.FakeExecutionContext,com.example.MockExecutionContext \
+  -Dgravitee.archrules.additionalContextClasses=io.gravitee.node.api.kafka.KafkaConnectionContext
 
 # Run only specific goal
 mvn gioArchRules:global-logging-check
@@ -239,6 +261,7 @@ mvn verify \
 | Parameter | Type | Default | CLI Property | Description |
 |-----------|------|---------|--------------|-------------|
 | `ignoreExecutionContextClasses` | `List<String>` | `[]` | `gravitee.archrules.ignoreExecutionContextClasses` | Fully qualified class names of ExecutionContext implementations to ignore (e.g., test doubles; comma-separated in CLI) |
+| `additionalContextClasses` | `List<String>` | `[]` | `gravitee.archrules.additionalContextClasses` | Fully qualified class names of additional context types to scan (e.g., `io.gravitee.node.api.kafka.KafkaConnectionContext`; comma-separated in CLI) |
 
 ## Execution Phase
 
