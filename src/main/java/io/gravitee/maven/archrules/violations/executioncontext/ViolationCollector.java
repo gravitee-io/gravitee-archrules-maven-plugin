@@ -112,15 +112,22 @@ public class ViolationCollector {
      * @return map of violation keys to violation information
      */
     private Map<ViolationKey, ViolationInfo> collectViolations() {
+        // Check if the class has an ExecutionContext field
+        boolean classHasExecutionContextField = hasExecutionContextField();
+
         // First pass: identify all methods WITH ExecutionContext (potential violations)
         Map<ViolationKey, Set<String>> violationsByMethod = new HashMap<>();
 
         for (JavaCodeUnit codeUnit : javaClass.getCodeUnits()) {
             boolean hasExecutionContextInParams = codeUnit.getParameters().stream().anyMatch(this::isExecutionContextType);
 
-            if (hasExecutionContextInParams) {
-                // Skip only if all logger calls go through withLogger
-                if (allLoggerCallsUseWithLogger(codeUnit)) {
+            // Consider context available if either in params OR as class field (but only if method is not static)
+            boolean hasExecutionContextAvailable = hasExecutionContextInParams || (classHasExecutionContextField && !isStatic(codeUnit));
+
+            if (hasExecutionContextAvailable) {
+                // Skip only if all logger calls go through withLogger AND context is in params (not field)
+                // When context is a field, we must check each call individually to detect mixed usage
+                if (!classHasExecutionContextField && hasExecutionContextInParams && allLoggerCallsUseWithLogger(codeUnit)) {
                     continue;
                 }
 
@@ -145,12 +152,21 @@ public class ViolationCollector {
 
                             // Check if this is a logger call
                             if (isLoggerType(call.getTargetOwner()) && LOG_METHODS.contains(call.getTarget().getName())) {
-                                // Check if previous call was withLogger
-                                boolean previousWasWithLogger =
-                                    i > 0 && WITH_LOGGER_METHOD_NAME.equals(methodCalls.get(i - 1).getTarget().getName());
+                                // Check if there's a withLogger call on the same line or the previous one
+                                int currentLine = call.getLineNumber();
+                                boolean hasWithLoggerOnSameOrPrevLine = false;
+
+                                for (int j = i - 1; j >= 0; j--) {
+                                    JavaMethodCall prevCall = methodCalls.get(j);
+                                    if (prevCall.getLineNumber() < currentLine - 1) break;
+                                    if (WITH_LOGGER_METHOD_NAME.equals(prevCall.getTarget().getName())) {
+                                        hasWithLoggerOnSameOrPrevLine = true;
+                                        break;
+                                    }
+                                }
 
                                 // Report only if NOT preceded by withLogger
-                                if (!previousWasWithLogger) {
+                                if (!hasWithLoggerOnSameOrPrevLine) {
                                     ViolationKey key = new ViolationKey(javaClass, methodToCheck.getName(), call.getTarget().getName());
                                     violationsByMethod.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(codeUnit.getName());
                                 }
@@ -191,8 +207,8 @@ public class ViolationCollector {
         }
 
         // Build final result with mixed-usage detection
-        // Mixed-usage: method is called WITH ctx (violation) AND also called WITHOUT ctx (legitimate)
-        // This means the private method serves both contexts and it's ambiguous whether it needs ctx
+        // Mixed-usage: method is called WITH ctx (violation) AND also called WITHOUT ctx (legitimate) AND there is no access to a ctx field
+        // This means the private method serves both contexts, and it's ambiguous whether it needs ctx
         return violationsByMethod
             .entrySet()
             .stream()
@@ -200,7 +216,9 @@ public class ViolationCollector {
                 Collectors.toMap(Map.Entry::getKey, entry -> {
                     ViolationKey key = entry.getKey();
                     Set<String> callers = entry.getValue();
-                    return isMixedUsage(callersWithoutContext, key) ? new ViolationInfo.Warning(callers) : new ViolationInfo.Error(callers);
+                    return isMixedUsage(callersWithoutContext, key) && !classHasExecutionContextField
+                        ? new ViolationInfo.Warning(callers)
+                        : new ViolationInfo.Error(callers);
                 })
             );
     }
@@ -270,18 +288,35 @@ public class ViolationCollector {
     }
 
     /**
+     * Checks if the class has an ExecutionContext field.
+     */
+    private boolean hasExecutionContextField() {
+        return javaClass
+            .getAllFields()
+            .stream()
+            .anyMatch(field -> {
+                String fullTypeName = field.getRawType().getName();
+                return isExecutionContextType(fullTypeName);
+            });
+    }
+
+    /**
      * Checks if a parameter type is an ExecutionContext.
      */
     private boolean isExecutionContextType(JavaParameter javaParameter) {
         String fullTypeName = javaParameter.getRawType().getName();
+        return isExecutionContextType(fullTypeName);
+    }
+
+    private boolean isExecutionContextType(String fullTypeName) {
         return (
-            (isExecutionContextType(fullTypeName) || isAdditionalContextType(fullTypeName)) &&
+            (containsExecutionContext(fullTypeName) || isAdditionalContextType(fullTypeName)) &&
             isNotLegacyExecutionContext(fullTypeName) &&
             isNotIgnoredExecutionContext(fullTypeName)
         );
     }
 
-    private static boolean isExecutionContextType(String fullTypeName) {
+    private static boolean containsExecutionContext(String fullTypeName) {
         return fullTypeName.contains("ExecutionContext");
     }
 
@@ -290,7 +325,7 @@ public class ViolationCollector {
     }
 
     private static boolean isNotLegacyExecutionContext(String fullTypeName) {
-        return !fullTypeName.contains("io.gravitee.gateway.api");
+        return !fullTypeName.startsWith("io.gravitee.gateway.api.");
     }
 
     private boolean isNotIgnoredExecutionContext(String fullTypeName) {
@@ -333,6 +368,10 @@ public class ViolationCollector {
     private static boolean isNonPublicMethod(JavaCodeUnit codeUnit) {
         Set<JavaModifier> modifiers = codeUnit.getModifiers();
         return modifiers.contains(JavaModifier.PRIVATE) || modifiers.contains(JavaModifier.PROTECTED);
+    }
+
+    private static boolean isStatic(JavaCodeUnit codeUnit) {
+        return codeUnit.getModifiers().contains(JavaModifier.STATIC);
     }
 
     private boolean belongsToClass(JavaCodeUnit codeUnit) {

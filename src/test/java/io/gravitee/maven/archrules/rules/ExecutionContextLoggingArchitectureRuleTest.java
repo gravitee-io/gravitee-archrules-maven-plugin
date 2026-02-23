@@ -59,7 +59,7 @@ class ExecutionContextLoggingArchitectureRuleTest {
         )
             .isInstanceOf(AssertionError.class)
             .hasMessageContaining("not call Logger directly when ExecutionContext is available")
-            .hasMessageContaining("was violated (9 times)");
+            .hasMessageContaining("was violated (11 times)");
     }
 
     @Test
@@ -78,7 +78,9 @@ class ExecutionContextLoggingArchitectureRuleTest {
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
-                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation"
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextMixedUsageViolation"
                     )
                 )
                 .check()
@@ -272,7 +274,9 @@ class ExecutionContextLoggingArchitectureRuleTest {
                         "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
-                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation"
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextMixedUsageViolation"
                     )
                 )
                 .check()
@@ -297,7 +301,9 @@ class ExecutionContextLoggingArchitectureRuleTest {
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
                         "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
-                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation"
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextMixedUsageViolation"
                     )
                 )
                 .check()
@@ -341,5 +347,82 @@ class ExecutionContextLoggingArchitectureRuleTest {
                 .allowInSuffixes(Set.of("Violation"))
                 .check()
         ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_class_has_execution_context_field_and_logs_directly() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithAdditionalContextViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("not call Logger directly when ExecutionContext is available")
+            .hasMessageContaining("[FieldExecutionContextViolation.process] calls Logger.info()");
+    }
+
+    @Test
+    void should_pass_when_class_has_execution_context_field_and_uses_withLogger() {
+        assertThatCode(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .excludePackages(Set.of("io.gravitee.maven.archrules.fixtures.violation.."))
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_pass_when_static_method_logs_directly_even_with_execution_context_field() {
+        assertThatCode(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .excludePackages(Set.of("io.gravitee.maven.archrules.fixtures.violation.."))
+                .check()
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_fail_when_field_context_has_mixed_usage_in_same_method() {
+        assertThatThrownBy(() ->
+            ExecutionContextLoggingArchitectureRule.configure()
+                .withOutputDirectory(Paths.get(TARGET_TEST_CLASSES))
+                .withWarningHandler(msg -> {}) // Silent handler for warnings
+                .allowIn(
+                    Set.of(
+                        "io.gravitee.maven.archrules.fixtures.violation.WithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.AnotherWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.subpackage.SubpackageWithExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithIgnoredExecutionContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.InternalMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.ProtectedMethodViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveCallViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.TransitiveWithContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MultipleCallersViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.MixedUsageViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.WithAdditionalContextViolation",
+                        "io.gravitee.maven.archrules.fixtures.violation.FieldExecutionContextViolation"
+                    )
+                )
+                .check()
+        )
+            .isInstanceOf(AssertionError.class)
+            .hasMessageContaining("not call Logger directly when ExecutionContext is available")
+            .hasMessageContaining("[FieldExecutionContextMixedUsageViolation.processWithMixedUsage] calls Logger.debug()");
     }
 }
