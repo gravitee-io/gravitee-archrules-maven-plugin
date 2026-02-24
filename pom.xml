@@ -21,7 +21,7 @@
 
     <groupId>io.gravitee.maven</groupId>
     <artifactId>gravitee-archrules-maven-plugin</artifactId>
-    <version>1.0.0-alpha.2</version>
+    <version>1.0.0-alpha.3</version>
     <packaging>maven-plugin</packaging>
     <inceptionYear>2015</inceptionYear>
     <description>The Gravitee.io ArchRules plugin for all Gravitee components.</description>

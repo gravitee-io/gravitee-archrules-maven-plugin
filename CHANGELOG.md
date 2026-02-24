@@ -1,3 +1,11 @@
+# [1.0.0-alpha.3](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/compare/1.0.0-alpha.2...1.0.0-alpha.3) (2026-02-24)
+
+
+### Features
+
+* add additional context to the rule check ([d6a0a7d](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/commit/d6a0a7d6661de84d55501f9344755a2716ea2d2a))
+* add support of execution context as field ([aee6000](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/commit/aee600022ed6b93e4da5f0d6874cc4e776e3d6c2))
+
 # [1.0.0-alpha.2](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/compare/1.0.0-alpha.1...1.0.0-alpha.2) (2026-02-18)
 
 
