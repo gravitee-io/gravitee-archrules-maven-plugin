@@ -1,3 +1,10 @@
+# [1.0.0-alpha.4](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/compare/1.0.0-alpha.3...1.0.0-alpha.4) (2026-03-31)
+
+
+### Bug Fixes
+
+* mark mojos as thread-safe for parallel Maven builds ([8870a37](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/commit/8870a373ffa7d27d6390a355a651c67bf3e14443))
+
 # [1.0.0-alpha.3](https://github.com/gravitee-io/gravitee-archrules-maven-plugin/compare/1.0.0-alpha.2...1.0.0-alpha.3) (2026-02-24)
 
 
