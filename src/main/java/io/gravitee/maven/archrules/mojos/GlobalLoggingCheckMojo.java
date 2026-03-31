@@ -25,7 +25,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
-@Mojo(name = "global-logging-check", defaultPhase = LifecyclePhase.VERIFY)
+@Mojo(name = "global-logging-check", defaultPhase = LifecyclePhase.VERIFY, threadSafe = true)
 public class GlobalLoggingCheckMojo extends SkippableMojo {
 
     /**
