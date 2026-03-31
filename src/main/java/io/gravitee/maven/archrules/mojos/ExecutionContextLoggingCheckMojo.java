@@ -25,7 +25,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
-@Mojo(name = "execution-context-logging-check", defaultPhase = LifecyclePhase.VERIFY)
+@Mojo(name = "execution-context-logging-check", defaultPhase = LifecyclePhase.VERIFY, threadSafe = true)
 public class ExecutionContextLoggingCheckMojo extends SkippableMojo {
 
     /**
