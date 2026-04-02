@@ -21,6 +21,545 @@
 
     <groupId>io.gravitee.maven</groupId>
     <artifactId>gravitee-archrules-maven-plugin</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
+    <packaging>maven-plugin</packaging>
+    <inceptionYear>2015</inceptionYear>
+    <description>The Gravitee.io ArchRules plugin for all Gravitee components.</description>
+    <url>https://github.com/gravitee-io/gravitee-archrules-maven-plugin</url>
+
     <name>Gravitee.io - Maven - Architecture Rules - Maven Plugin</name>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>https://github.com/gravitee-io/gravitee-archrules-maven-plugin</url>
+        <connection>scm:git:git://github.com/gravitee-io/gravitee-archrules-maven-plugin.git</connection>
+        <developerConnection>scm:git:git@github.com:gravitee-io/gravitee-archrules-maven-plugin.git</developerConnection>
+    </scm>
+
+    <organization>
+        <name>Gravitee.IO</name>
+        <url>https://gravitee.io</url>
+    </organization>
+
+    <developers>
+        <developer>
+            <email>azize@graviteesource.com</email>
+            <name>Azize ELAMRANI</name>
+            <url>https://github.com/aelamrani</url>
+            <id>aelamrani</id>
+        </developer>
+        <developer>
+            <email>david@graviteesource.com</email>
+            <name>David BRASSELY</name>
+            <url>https://github.com/brasseld</url>
+            <id>brasseld</id>
+        </developer>
+        <developer>
+            <email>nicolas@graviteesource.com</email>
+            <name>Nicolas GERAUD</name>
+            <url>https://github.com/NicolasGeraud</url>
+            <id>NicolasGeraud</id>
+        </developer>
+        <developer>
+            <email>titouan@graviteesource.com</email>
+            <name>Titouan COMPIEGNE</name>
+            <url>https://github.com/tcompiegne</url>
+            <id>tcompiegne</id>
+        </developer>
+    </developers>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>sonatype-nexus-snapshots</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+        </snapshotRepository>
+        <repository>
+            <id>sonatype-nexus-staging</id>
+            <url>https://central.sonatype.com</url>
+        </repository>
+    </distributionManagement>
+
+    <properties>
+        <surefireArgLine></surefireArgLine>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>21</java.version>
+        <maven-plugin-api.version>3.9.6</maven-plugin-api.version>
+        <maven-plugin-annotations.version>3.11.0</maven-plugin-annotations.version>
+        <maven-core.version>3.9.6</maven-core.version>
+        <archunit.version>1.2.1</archunit.version>
+        <assertj-core.version>3.25.3</assertj-core.version>
+        <slf4j-api.version>2.0.12</slf4j-api.version>
+        <junit-jupiter.version>5.10.2</junit-jupiter.version>
+        <lombok.version>1.18.42</lombok.version>
+        <mockito-core.version>5.10.0</mockito-core.version>
+        <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
+        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+        <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+        <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+        <maven-resources-plugin.version>3.4.0</maven-resources-plugin.version>
+        <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
+        <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+        <license-maven-plugin.version>4.6</license-maven-plugin.version>
+        <prettier-maven-plugin.version>0.22</prettier-maven-plugin.version>
+        <prettier-maven-plugin.prettierJavaVersion>2.7.5</prettier-maven-plugin.prettierJavaVersion>
+        <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
+        <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
+        <skip.validation>false</skip.validation>
+    </properties>
+
+    <dependencies>
+        <!-- Maven Plugin API -->
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-plugin-api</artifactId>
+            <version>${maven-plugin-api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.maven.plugin-tools</groupId>
+            <artifactId>maven-plugin-annotations</artifactId>
+            <version>${maven-plugin-annotations.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-core</artifactId>
+            <version>${maven-core.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ArchUnit -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <version>${archunit.version}</version>
+        </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit-jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj-core.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito-core.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito-core.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- SLF4J for test fixtures -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j-api.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${maven-assembly-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>${versions-maven-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>${maven-enforcer-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>enforce-no-log4j</id>
+                            <goals>
+                                <goal>enforce</goal>
+                            </goals>
+                            <configuration>
+                                <rules>
+                                    <bannedDependencies>
+                                        <message>No log4j implementations allowed</message>
+                                        <excludes>
+                                            <exclude>org.apache.logging.log4j</exclude>
+                                        </excludes>
+                                        <includes>
+                                            <!-- log4j-api can be used by some dependencies instead of slf4j-api -->
+                                            <!-- in order to work with logback, we need to allow it and also the bridge log4j to slf4j -->
+                                            <include>org.apache.logging.log4j:log4j-api</include>
+                                            <include>org.apache.logging.log4j:log4j-to-slf4j</include>
+                                        </includes>
+                                    </bannedDependencies>
+                                </rules>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>enforce-no-snapshots</id>
+                            <goals>
+                                <goal>enforce</goal>
+                            </goals>
+                            <configuration>
+                                <!-- will be activated only in release profiles-->
+                                <skip>true</skip>
+                                <rules>
+                                    <requireReleaseDeps>
+                                        <message>No Snapshots Allowed!</message>
+                                        <excludes>
+                                            <!-- Workaround to break cyclic dependencies in APIM between plugins and core APIM -->
+                                            <exclude>io.gravitee.*:*:*:*:test</exclude>
+                                            <exclude>io.gravitee.apim.*:*:*:*:provided</exclude>
+                                        </excludes>
+                                    </requireReleaseDeps>
+                                    <requireReleaseVersion>
+                                        <message>No Snapshots Allowed!</message>
+                                    </requireReleaseVersion>
+                                </rules>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven-resources-plugin.version}</version>
+                    <configuration>
+                        <encoding>UTF-8</encoding>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                    <configuration>
+                        <argLine>${surefireArgLine}</argLine>
+                        <includes>
+                            <!-- Default inclusions -->
+                            <include>**/Test*.java</include>
+                            <include>**/*Test.java</include>
+                            <include>**/*TestCase.java</include>
+
+                            <!-- Test suite inclusion -->
+                            <include>**/*Suite.java</include>
+                        </includes>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>com.mycila</groupId>
+                    <artifactId>license-maven-plugin</artifactId>
+                    <version>${license-maven-plugin.version}</version>
+                    <configuration>
+                        <properties>
+                            <owner>The Gravitee team</owner>
+                            <email>http://gravitee.io</email>
+                        </properties>
+                        <licenseSets>
+                            <licenseSet>
+                                <header>com/mycila/maven/plugin/license/templates/APACHE-2.txt</header>
+                                <excludes>
+                                    <exclude>LICENSE.txt</exclude>
+                                    <exclude>NOTICE.txt</exclude>
+                                    <exclude>**/README</exclude>
+                                    <exclude>src/main/packaging/**</exclude>
+                                    <exclude>src/test/resources/**</exclude>
+                                    <exclude>src/main/resources/**</exclude>
+                                    <exclude>src/main/webapp/**</exclude>
+                                    <exclude>node_modules/**</exclude>
+                                    <exclude>dist/**</exclude>
+                                    <exclude>.tmp/**</exclude>
+                                    <exclude>.*</exclude>
+                                    <exclude>.*/**</exclude>
+                                    <exclude>**/*.adoc</exclude>
+                                </excludes>
+                            </licenseSet>
+                        </licenseSets>
+                        <skip>${skip.validation}</skip>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.sonatype.central</groupId>
+                    <artifactId>central-publishing-maven-plugin</artifactId>
+                    <version>${central-publishing-maven-plugin.version}</version>
+                    <extensions>true</extensions>
+                    <configuration>
+                        <publishingServerId>sonatype-nexus-staging</publishingServerId>
+                        <autoPublish>true</autoPublish>
+                        <deploymentName>${project.artifactId}:${project.version}</deploymentName>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>${maven-gpg-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>sign-artifacts</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>sign</goal>
+                            </goals>
+                            <configuration>
+                                <gpgArguments>
+                                    <arg>--pinentry-mode</arg>
+                                    <arg>loopback</arg>
+                                </gpgArguments>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven-source-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven-javadoc-plugin.version}</version>
+                    <configuration>
+                        <doclint>none</doclint>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>com.hubspot.maven.plugins</groupId>
+                    <artifactId>prettier-maven-plugin</artifactId>
+                    <version>${prettier-maven-plugin.version}</version>
+                    <configuration>
+                        <prettierJavaVersion>${prettier-maven-plugin.prettierJavaVersion}</prettierJavaVersion>
+                        <skip>${skip.validation}</skip>
+                        <inputGlobs>
+                            <inputGlob>src/main/java/**/*.java</inputGlob>
+                            <inputGlob>src/test/java/**/*.java</inputGlob>
+                            <inputGlob>**/*.json</inputGlob>
+                            <inputGlob>**/*.yaml</inputGlob>
+                            <inputGlob>**/*.yml</inputGlob>
+                        </inputGlobs>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <phase>validate</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-plugin-plugin</artifactId>
+                <version>${maven-plugin-annotations.version}</version>
+                <configuration>
+                    <goalPrefix>gioArchRules</goalPrefix>
+                </configuration>
+            </plugin>
+<!--            Plugins used by gravitee-parent-->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>validate</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.hubspot.maven.plugins</groupId>
+                <artifactId>prettier-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>${os-maven-plugin.version}</version>
+            </extension>
+        </extensions>
+    </build>
+
+    <profiles>
+        <profile>
+            <!-- Profile used to release open source modules -->
+            <id>gravitee-release</id>
+            <activation>
+                <property>
+                    <name>performRelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>enforce-no-snapshots</id>
+                                <configuration>
+                                    <skip>false</skip>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- Profile used to release enterprise modules -->
+            <id>gio-release</id>
+
+            <activation>
+                <property>
+                    <name>performRelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>enforce-no-snapshots</id>
+                                <configuration>
+                                    <skip>false</skip>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <repositories>
+        <repository>
+            <name>Central Portal Snapshots</name>
+            <id>central-portal-snapshots</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
 </project>
