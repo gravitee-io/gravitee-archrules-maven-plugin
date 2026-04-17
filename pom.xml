@@ -96,7 +96,7 @@
         <archunit.version>1.2.1</archunit.version>
         <assertj-core.version>3.27.7</assertj-core.version>
         <slf4j-api.version>2.0.17</slf4j-api.version>
-        <junit-jupiter.version>5.10.2</junit-jupiter.version>
+        <junit-jupiter.version>5.14.3</junit-jupiter.version>
         <lombok.version>1.18.44</lombok.version>
         <mockito-core.version>5.23.0</mockito-core.version>
         <maven-assembly-plugin.version>3.8.0</maven-assembly-plugin.version>
