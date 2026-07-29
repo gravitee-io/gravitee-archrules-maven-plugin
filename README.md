@@ -294,7 +294,13 @@ A: `allowList` exempts classes from **all** rule checks in that goal, while `ign
 
 - **Java:** 21+
 - **Maven:** 3.9.6+
-- **ArchUnit:** 1.2.1
+- **ArchUnit:** 1.4.2
+
+ArchUnit 1.2.1, bundled by earlier versions of the plugin, shades an ASM that rejects any class
+file above major version 66 (Java 22). On a JDK 23 or newer build the importer therefore throws on
+every class it reads — including the JDK's own `java.base` classes — falls back to a simple import
+and leaves the rules with nothing to check, while still reporting that they passed. ArchUnit 1.4.2
+raises that ceiling to major version 70 (Java 26).
 
 ## License
 
