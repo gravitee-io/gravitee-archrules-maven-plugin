@@ -292,15 +292,27 @@ A: `allowList` exempts classes from **all** rule checks in that goal, while `ign
 
 ## Requirements
 
-- **Java:** 21+
+- **Java:** 25+
 - **Maven:** 3.9.6+
 - **ArchUnit:** 1.4.2
 
-ArchUnit 1.2.1, bundled by earlier versions of the plugin, shades an ASM that rejects any class
-file above major version 66 (Java 22). On a JDK 23 or newer build the importer therefore throws on
-every class it reads — including the JDK's own `java.base` classes — falls back to a simple import
-and leaves the rules with nothing to check, while still reporting that they passed. ArchUnit 1.4.2
-raises that ceiling to major version 70 (Java 26).
+## Compatibility matrix
+
+| Plugin | Maven JVM | ArchUnit | JDK bytecode compatibility |
+|--------|-----------|----------|----------------------------|
+| 2.x    | 25+       | 1.4.2    | up to Java 26 (major 70)   |
+| 1.x    | 21+       | 1.2.1    | up to Java 22 (major 66)   |
+
+The two columns answer different questions. **Maven JVM** is the JDK the plugin itself needs to
+load and run — it is set by the plugin's own bytecode level, and has nothing to do with the
+`maven.compiler.release` of the project being checked. **JDK bytecode compatibility** is the
+highest class file version the bundled ArchUnit can parse, which caps the bytecode the rules can
+actually analyse.
+
+That second column is the one to watch, because exceeding it fails silently. Past its ceiling the
+importer throws on every class it reads — the project's own and the JDK's `java.base` alike —
+falls back to a simple import, and the mojos still report that all rules passed. A build using 1.x
+on JDK 23 or newer runs the checks and verifies nothing.
 
 ## License
 
